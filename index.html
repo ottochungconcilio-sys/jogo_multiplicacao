@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Jogo de Matemática — Quadrados & Multiplicação</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--accent:#7c3aed;--muted:#94a3b8;--success:#10b981;--danger:#ef4444}
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;color:#e6eef8;background:linear-gradient(135deg, #071029 0%, #071226 100%)}
+    .wrap{max-width:900px;margin:40px auto;padding:24px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    h1{font-size:1.4rem;margin:0}
+    .controls{display:flex;gap:12px}
+    .mode-btn{background:linear-gradient(180deg,#1f2937,#111827);border:1px solid rgba(255,255,255,0.04);color:#fff;padding:10px 16px;border-radius:10px;cursor:pointer;font-weight:600}
+    .mode-btn.active{box-shadow:0 6px 18px rgba(124,58,237,0.18);border-color:rgba(124,58,237,0.6);background:linear-gradient(180deg,#5b21b6,#4c1d95)}
+    main{display:grid;grid-template-columns:1fr 320px;gap:18px}
+    .card{background:rgba(255,255,255,0.03);padding:18px;border-radius:12px;min-height:220px}
+    .question{font-size:1.6rem;font-weight:700;margin-bottom:14px}
+    .answers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .answer-btn{padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);background:rgba(255,255,255,0.02);cursor:pointer;font-size:1rem;font-weight:700}
+    .answer-btn.correct{outline:3px solid rgba(16,185,129,0.12);box-shadow:0 6px 18px rgba(16,185,129,0.08)}
+    .answer-btn.wrong{outline:3px solid rgba(239,68,68,0.08);opacity:0.9}
+    .meta{display:flex;flex-direction:column;gap:8px}
+    .stat{background:rgba(255,255,255,0.02);padding:10px;border-radius:8px}
+    .small{color:var(--muted);font-size:0.9rem}
+    .feedback{height:28px;display:flex;align-items:center;gap:10px}
+    .hint{color:var(--muted);font-size:0.95rem}
+    footer{margin-top:16px;color:var(--muted);font-size:0.85rem}
+    @media (max-width:820px){main{grid-template-columns:1fr;}.meta{order:2}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Jogo de Matemática — Quadrados & Multiplicação</h1>
+      <div class="controls" role="tablist" aria-label="Modos do jogo">
+        <button id="btn-squares" class="mode-btn">Quadrados</button>
+        <button id="btn-mult" class="mode-btn">Multiplicação</button>
+      </div>
+    </header>
+
+    <!-- Seletor de níveis -->
+    <div class="controls" style="margin-bottom:18px">
+      <label class="small" style="margin-right:8px">Nível:</label>
+      <select id="level" style="padding:6px 10px;border-radius:8px;background:#111827;color:#fff;border:1px solid rgba(255,255,255,0.08)">
+        <option value="1">Fácil</option>
+        <option value="2">Médio</option>
+        <option value="3">Difícil</option>
+      </select>
+    </div>
+
+    <main>
+      <section class="card" aria-live="polite">
+        <div class="question" id="question">Escolha um modo para começar</div>
+
+        <div class="answers" id="answers" aria-label="Opções de resposta">
+          <!-- Botões de resposta serão inseridos aqui dinamicamente -->
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="feedback" id="feedback"><span class="hint">Dica: use 1,2,3,4 no teclado para responder.</span></div>
+        <footer>
+          <small class="small">Após responder, o próximo problema aparece automaticamente.</small>
+        </footer>
+      </section>
+
+      <aside class="meta">
+        <div class="stat">
+          <div class="small">Modo</div>
+          <div id="mode">—</div>
+        </div>
+        <div class="stat">
+          <div class="small">Pontuação</div>
+          <div id="score">0</div>
+        </div>
+        <div class="stat">
+          <div class="small">Acertos seguidos</div>
+          <div id="streak">0</div>
+        </div>
+        <div class="stat">
+          <div class="small">Total de questões</div>
+          <div id="count">0</div>
+        </div>
+        <div class="stat">
+          <div class="small">Último resultado</div>
+          <div id="last">—</div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    // Seletores
+    const btnSquares = document.getElementById('btn-squares')
+    const btnMult = document.getElementById('btn-mult')
+    const questionEl = document.getElementById('question')
+    const answersEl = document.getElementById('answers')
+    const feedbackEl = document.getElementById('feedback')
+    const modeEl = document.getElementById('mode')
+    const scoreEl = document.getElementById('score')
+    const streakEl = document.getElementById('streak')
+    const countEl = document.getElementById('count')
+    const lastEl = document.getElementById('last')
+
+    let mode = null // 'squares' or 'mult'
+    let level = 1
+    let correctAnswer = null
+    let score = 0
+    let streak = 0
+    let total = 0
+
+    // Helpers
+    function randInt(min, max){ return Math.floor(Math.random()*(max-min+1))+min }
+
+    function shuffle(array){
+      for(let i=array.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));[array[i],array[j]]=[array[j],array[i]]
+      }
+      return array
+    }
+
+    function uniqueChoices(correct, generate, n=3){
+      const set=new Set([correct])
+      const choices=[]
+      while(choices.length<n){
+        const v=generate()
+        if(!set.has(v) && Number.isFinite(v)){
+          set.add(v)
+          choices.push(v)
+        }
+      }
+      return choices
+    }
+
+    function formatNumber(n){ return n.toString() }
+
+    // Geração de questões
+    function makeMultiplication(){
+      const a = randInt(10,99)
+      const b = randInt(10,99)
+      const correct = a*b
+      const wrongs = uniqueChoices(correct, ()=>{
+        // gerar um erro plausível: trocar um dígito ou +/- prox
+        const choiceType = randInt(0,2)
+        if(choiceType===0){ // variar um fator
+          const a2 = a + randInt(-8,8)
+          const b2 = b + randInt(-8,8)
+          return Math.max(1, a2)*Math.max(1,b2)
+        } else { // +/- pequeno
+          return correct + randInt(-150,150)
+        }
+      },3)
+      return {text:`${a} × ${b} = ?`, correct, options: shuffle([correct,...wrongs])}
+    }
+
+    function makeSquare(){
+      const a = randInt(10,99)
+      const correct = a*a
+      const wrongs = uniqueChoices(correct, ()=>{
+        const type = randInt(0,2)
+        if(type===0){ // neighbour square
+          const d = randInt(-6,6)
+          const v = (a+d)*(a+d)
+          return v
+        } else if(type===1){ // common mistake: a*(a+1) or (a-1)*a
+          return a*(a+randInt(-3,3))
+        }
+        return correct + randInt(-120,120)
+      },3)
+      return {text:`${a}² = ?`, correct, options: shuffle([correct,...wrongs])}
+    }
+
+    function renderQuestion(q){
+      questionEl.textContent = q.text
+      answersEl.innerHTML = ''
+      q.options.forEach((opt, idx)=>{
+        const btn = document.createElement('button')
+        btn.className = 'answer-btn'
+        btn.setAttribute('data-val', opt)
+        btn.setAttribute('aria-pressed','false')
+        btn.innerHTML = `<strong>${idx+1}.</strong> <span style="margin-left:8px">${formatNumber(opt)}</span>`
+        btn.addEventListener('click', ()=> handleAnswer(opt, btn))
+        answersEl.appendChild(btn)
+      })
+      correctAnswer = q.correct
+      // update meta
+      modeEl.textContent = mode === 'squares' ? 'Quadrados' : 'Multiplicação'
+    }
+
+    function handleAnswer(value, btn){
+      // impedir múltiplos cliques
+      if(btn.disabled) return
+      const buttons = Array.from(answersEl.querySelectorAll('button'))
+      buttons.forEach(b=>b.disabled=true)
+
+      total += 1
+      countEl.textContent = total
+
+      if(Number(value) === Number(correctAnswer)){
+        btn.classList.add('correct')
+        feedbackEl.innerHTML = `<span style="color:var(--success);font-weight:700">Acertou! ✅</span>`
+        score += 10
+        streak += 1
+        lastEl.textContent = 'Acertou'
+      } else {
+        // marcar o escolhido como errado e destacar o certo
+        btn.classList.add('wrong')
+        feedbackEl.innerHTML = `<span style="color:var(--danger);font-weight:700">Errado ❌</span> <span class="small">Resposta correta: ${formatNumber(correctAnswer)}</span>`
+        // destacar correto
+        const correctBtn = buttons.find(b=>Number(b.getAttribute('data-val'))===Number(correctAnswer))
+        if(correctBtn) correctBtn.classList.add('correct')
+        score = Math.max(0, score-4)
+        streak = 0
+        lastEl.textContent = 'Errou'
+      }
+      scoreEl.textContent = score
+      streakEl.textContent = streak
+
+      // próximo problema depois de 900ms
+      setTimeout(()=> nextQuestion(), 900)
+    }
+
+    function nextQuestion(){
+      feedbackEl.innerHTML = `<span class="hint">Pronto — resolva a próxima!</span>`
+      if(mode === 'mult') renderQuestion(makeMultiplication())
+      else if(mode === 'squares') renderQuestion(makeSquare())
+    }
+
+    // Eventos de seleção de modo
+    document.getElementById('level').addEventListener('change', (e)=>{
+      level = Number(e.target.value)
+    })
+
+    btnSquares.addEventListener('click', ()=>{
+      mode = 'squares'
+      btnSquares.classList.add('active'); btnMult.classList.remove('active')
+      score = 0; streak = 0; total = 0
+      scoreEl.textContent = score; streakEl.textContent = streak; countEl.textContent = total; lastEl.textContent = '—'
+      renderQuestion(makeSquare())
+    })
+
+    btnMult.addEventListener('click', ()=>{
+      mode = 'mult'
+      btnMult.classList.add('active'); btnSquares.classList.remove('active')
+      score = 0; streak = 0; total = 0
+      scoreEl.textContent = score; streakEl.textContent = streak; countEl.textContent = total; lastEl.textContent = '—'
+      renderQuestion(makeMultiplication())
+    })
+
+    // Suporte teclado 1-4
+    window.addEventListener('keydown', (e)=>{
+      const key = e.key
+      if(['1','2','3','4'].includes(key)){
+        const idx = Number(key)-1
+        const btn = answersEl.children[idx]
+        if(btn) btn.click()
+      }
+    })
+
+    // Acessibilidade adicional: foco no primeiro botão ao gerar
+    const observer = new MutationObserver(()=>{
+      const first = answersEl.querySelector('button')
+      if(first) first.focus()
+    })
+    observer.observe(answersEl, {childList:true})
+
+    // Dicas finais
+    // O jogo é auto-contido — salve este arquivo como .html e abra no navegador.
+  </script>
+</body>
+</html>
