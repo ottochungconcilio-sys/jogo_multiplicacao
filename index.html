@@ -18,7 +18,7 @@
     .card{background:rgba(255,255,255,0.03);padding:18px;border-radius:12px;min-height:220px}
     .question{font-size:1.6rem;font-weight:700;margin-bottom:14px}
     .answers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .answer-btn{$1
+    .answer-btn{color:#ffffff !important; $1
       color:#ffffff;
     }
     .answer-btn.correct{outline:3px solid rgba(16,185,129,0.12);box-shadow:0 6px 18px rgba(16,185,129,0.08)}
@@ -181,7 +181,7 @@
         btn.className = 'answer-btn'
         btn.setAttribute('data-val', opt)
         btn.setAttribute('aria-pressed','false')
-        btn.innerHTML = `<strong style="color:#ffffff">${idx+1}.</strong> <span style="margin-left:8px">${formatNumber(opt)}</span>`
+        btn.innerHTML = `<strong style="color:#ffffff">${idx+1}.</strong> <span style="margin-left:8px;color:#ffffff">${formatNumber(opt)}</span>`
         btn.addEventListener('click', ()=> handleAnswer(opt, btn))
         answersEl.appendChild(btn)
       })
